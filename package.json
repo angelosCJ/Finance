@@ -9,10 +9,25 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "expo": "~52.0.39",
+    "@expo/vector-icons": "^14.0.4",
+    "@fortawesome/fontawesome-svg-core": "^6.7.2",
+    "@fortawesome/free-brands-svg-icons": "^6.7.2",
+    "@fortawesome/free-regular-svg-icons": "^6.7.2",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
+    "@fortawesome/react-native-fontawesome": "^0.3.2",
+    "axios": "^1.8.4",
+    "expo": "^52.0.42",
+    "expo-linear-gradient": "^14.0.2",
+    "expo-splash-screen": "^0.29.22",
     "expo-status-bar": "~2.0.1",
     "react": "18.3.1",
-    "react-native": "0.76.7"
+    "react-native": "0.76.8",
+    "react-native-chart-kit": "^6.12.0",
+    "react-native-font-scale": "^1.0.3",
+    "react-native-pie-chart": "^4.0.1",
+    "react-native-responsive-fontsize": "^0.5.1",
+    "react-native-svg": "15.8.0",
+    "react-native-svg-charts": "^5.4.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
