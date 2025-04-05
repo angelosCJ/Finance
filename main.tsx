@@ -1,17 +1,18 @@
 import { useContext, useEffect, useRef, useState } from "react";
-import { useWindowDimensions, View, StyleSheet, Animated, TouchableOpacity, Text, TextInput, KeyboardAvoidingView, Platform, ScrollView, TouchableWithoutFeedback, Keyboard } from "react-native";
+import { useWindowDimensions, View, StyleSheet, Animated, TouchableOpacity, Text, TextInput, ScrollView, Image } from "react-native";
 import { ThemeContext } from "./Theme";
 import { RFValue } from "react-native-responsive-fontsize";
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faCcMastercard, faCcVisa, faPaypal } from "@fortawesome/free-brands-svg-icons";
-import { faArrowDown, faArrowRotateLeft, faArrowsSpin, faBasketShopping, faBed, faBolt, faBuildingColumns, faBus,  faCarOn, faCarSide, faCartArrowDown, faCartShopping, faCheck, faChurch, faCloudArrowUp, faDeleteLeft, faFaceSmile, faFaucetDrip, faFileExport, faFileInvoiceDollar, faFireFlameSimple, faGasPump, faHandHoldingDollar, faHandHoldingHeart, faHandHoldingWater, faHotel, faHouseFloodWater, faHouseUser, faLayerGroup, faMicrochip, faMoneyBill, faMoneyCheck, faMosque, faParking, faPenNib, faPersonMilitaryToPerson, faPiggyBank, faPlane, faPrescriptionBottle, faPrescriptionBottleMedical, faPumpMedical, faRecycle, faScrewdriverWrench, faShoppingCart, faSquareParking, faStethoscope, faTelevision, faTrainTram, faTShirt, faTv, faUtensils, faWifi } from "@fortawesome/free-solid-svg-icons";
+import { faArrowDown, faArrowRotateLeft, faArrowsSpin, faBasketShopping, faBed, faBolt, faBuildingColumns, faBus,  faCarOn, faCarSide, faCartArrowDown, faCartShopping, faCheck, faChurch, faFaceSmile, faFaucetDrip, faFileInvoiceDollar, faFireFlameSimple, faGasPump, faGear, faGears, faHandHoldingDollar, faHandHoldingHeart, faHotel, faHouseUser, faMicrochip, faMosque, faParking, faPenNib, faPiggyBank, faPlane, faPrescriptionBottleMedical, faPumpMedical, faRecycle, faScrewdriverWrench, faShoppingCart, faSquareParking, faStethoscope, faTelevision, faTrainTram, faTrashCan, faTShirt, faTv, faUtensils, faWifi } from "@fortawesome/free-solid-svg-icons";
 import { faFloppyDisk } from "@fortawesome/free-regular-svg-icons";
 import axios from "axios";
-import {  LineChart } from 'react-native-chart-kit';
 import PieChart from 'react-native-pie-chart';
-import { Colors } from "react-native/Libraries/NewAppScreen";
+
+
+
 
 
 export default function Main() {
@@ -23,11 +24,25 @@ export default function Main() {
         throw new Error("ThemeContext must be used within a ThemeProvider");
     }
 
-    const { theme, changeTheme, position,
-         analyticsState, openAnalytics, planningState,
-         openPlanning,openHome,categoryState,showCategory } = context;
+    const {   theme, 
+        changeTheme, 
+        position, 
+        analyticsState, 
+        openAnalytics, 
+        planningState, 
+        openPlanning,
+        openHome,
+        categoryState,
+        showCategory,
+        settings,
+        toggleSettings, } = context;
 
     // Set initial positions based on state
+
+    const rotateRefresh = useRef(new Animated.Value(0)).current;
+    const [loading, setLoading] = useState(false);
+    const loopAnimation = useRef<any>(null);
+    const on_off_settings = useRef(new Animated.Value(window.width)).current;
     const left_right = useRef(new Animated.Value(position === "left" ? window.width * -0.037 : window.width * 0.114)).current;
     const open_close_analytics = useRef(new Animated.Value(analyticsState === "openA" ? 0 : window.width)).current;
     const open_close_planning = useRef(new Animated.Value(planningState === "openP" ? 0 : window.width)).current;
@@ -51,9 +66,18 @@ export default function Main() {
     const [seriesSum,setSeriesSum] = useState<number>(0);
     const [savingsPercent,setSavingsPercent] = useState<number>(0);
     const [monthlyPercent,setMonthlyPercent] = useState<number>(0);
+    const [moveDeleteBtn,setMoveDeleteBtn] = useState<number>(0.5);
+    const [updateSettings, setUpdateSettings] = useState<"openSettings" | "closeSettings">("closeSettings");
+    const [intro,setIntro] = useState<number>(0);
     
+    const showIntro = () => {
+        setTimeout(()=>{
+            setIntro(-1);
+        },6000);
+    }
 
-    const widthAndHeight = 200
+
+    const widthAndHeight = 200;
 
     const series = [
         { value: Number(monthlySum), color: "rgb(245,103,1)", label: { text: 'Spending', fontWeight: 'bold', fill:"white", offsetY: 5, offsetX: 0 } },
@@ -61,7 +85,6 @@ export default function Main() {
         { value: Number(savings), color: "rgb(68, 208, 94)", label: { text: 'Savings', fontWeight: 'bold', offsetY: 5, offsetX: 2 , fill:"white"} },
       ];
       
-
     const clearTextFields = () => {
         setMoneySpent("");
         setMonthlyIncome("");
@@ -70,6 +93,13 @@ export default function Main() {
         setCheckmarkColor("rgb(255, 255, 255)");
     }
 
+    const enableDeleteBtn = () => {
+        setMoveDeleteBtn(0.01);
+    }
+
+    const disableDeleteBtn = () => {
+        setMoveDeleteBtn(0.5);
+    }
 
     const sendFinanceData = async () => {
         const parsedData = {
@@ -98,105 +128,115 @@ export default function Main() {
         }
     };
 
-   
-   
     const displayFinanceData = async () => {
+        setLoading(true);
+      
+        // Start rotation
+        loopAnimation.current = Animated.loop(
+          Animated.timing(rotateRefresh, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          })
+        );
+        rotateRefresh.setValue(0); // reset before loop
+        loopAnimation.current.start();
+      
         try {
-            const response = await axios.get("https://financeapi-1.onrender.com/getData");
-            setShowData(response.data); // Store the full data array
-    
-            // Create a map of icons for each category
-            const categoryIcons: { [key: string]: any } = {
-                "House Rent": faHouseUser,
-                "Shopping": faShoppingCart,
-                "Food": faUtensils,
-                "Public Transport": faBus,
-                "Private Car": faCarSide,
-                "Hotel": faHotel,
-                "Wifi": faWifi,
-                "TV Subscription":faTv,
-                "Groceries": faBasketShopping,
-                "Water Bill": faFaucetDrip,
-                "Electricity Bill": faBolt,
-                "Hospital": faStethoscope,
-                "Pharmacy": faPrescriptionBottleMedical,
-                "Electronic Device": faMicrochip,
-                "Clothes": faTShirt,
-                "Maintainance": faScrewdriverWrench,
-                "Salary": faFileInvoiceDollar,
-                "Hired Vehicle": faCarOn,
-                "Fun Activity": faFaceSmile,
-                "Air Travel": faPlane,
-                "Online Shopping": faCartArrowDown,
-                "Waste Collection": faRecycle,
-                "Parking Bill": faParking,
-                "Room Rent": faBed,
-                "Church Collection": faChurch,
-                "Mosque Donations": faMosque,
-                "Charity": faHandHoldingHeart,
-                "Hygiene Product": faPumpMedical,
-                "Tax Bill": faBuildingColumns,
-                "Fuel": faGasPump,
-                "Gas": faFireFlameSimple
-
-            };
-
-            const categoryColors: { [key: string]: any } = {
-                "House Rent": "rgb(153,0,101)",
-                "Wifi": "rgb(153,0,101)",
-                "TV Subscription":"rgb(153,0,101)",
-                "Groceries": "rgb(153,0,101)", 
-                "Water Bill": "rgb(153,0,101)", 
-                "Electricity Bill": "rgb(153,0,101)",
-                "Hospital": "rgb(153,0,101)",
-                "Pharmacy": "rgb(153,0,101)",
-                "Public Transport":"rgb(245,103,1)",
-                "Private Car":"rgb(245,103,1)",
-                "Fuel": "rgb(245,103,1)",
-                "Gas":"rgb(245,103,1)",
-                "Hotel": "rgb(245,103,1)",
-                "Electronic Device": "rgb(245,103,1)",
-                "Food": "rgb(68, 208, 94)",
-                "Clothes": "rgb(68, 208, 94)",
-                "Maintainance":  "rgb(68, 208, 94)",
-                "Salary": "rgb(68, 208, 94)",
-                "Hired Vehicle": "rgb(68, 208, 94)",
-                "Fun Activity": "rgb(68, 208, 94)",
-                 "Air Travel":  "rgb(68, 208, 94)",
-                "Online Shopping": "rgb(68, 208, 94)",
-                "Waste Collection":  "rgb(68, 208, 94)",
-                "Parking Bill": "rgb(118,99,213)",
-                "Room Rent": "rgb(118,99,213)",
-                "Church Collection": "rgb(118,99,213)",
-                "Mosque Donations": "rgb(118,99,213)",
-                "Charity":"rgb(118,99,213)",
-                "Hygiene Product": "rgb(118,99,213)",
-                "Tax Bill": "rgb(118,99,213)",
-                "Shopping":"rgb(118,99,213)",
-
-            }
-
-            const colorMapping = response.data.reduce((acc: { [x: string]: any; }, item: { _id: string | number; categoryName: string | number; }) => {
-                acc[item._id] = categoryColors[item.categoryName] || "rgb(153,0,101)"; // Default to faHouseUser
-                return acc;
-            }, {} as { [key: string]: any });
-
-            setIconBgColor(colorMapping);
-    
-            // Generate a mapping of `_id` to icon
-            const iconMapping = response.data.reduce((acc: { [x: string]: any; }, item: { _id: string | number; categoryName: string | number; }) => {
-                acc[item._id] = categoryIcons[item.categoryName] || faHouseUser; // Default to faHouseUser
-                return acc;
-            }, {} as { [key: string]: any });
-     
-            setIconMap(iconMapping);
-          
-
+          const response = await axios.get("https://financeapi-1.onrender.com/getData");
+          setShowData(response.data); // Store the full data array
+      
+          const categoryIcons: { [key: string]: any } = {
+            "House Rent": faHouseUser,
+            "Shopping": faShoppingCart,
+            "Food": faUtensils,
+            "Public Transport": faBus,
+            "Private Car": faCarSide,
+            "Hotel": faHotel,
+            "Wifi": faWifi,
+            "TV Subscription": faTv,
+            "Groceries": faBasketShopping,
+            "Water Bill": faFaucetDrip,
+            "Electricity Bill": faBolt,
+            "Hospital": faStethoscope,
+            "Pharmacy": faPrescriptionBottleMedical,
+            "Electronic Device": faMicrochip,
+            "Clothes": faTShirt,
+            "Maintainance": faScrewdriverWrench,
+            "Salary": faFileInvoiceDollar,
+            "Hired Vehicle": faCarOn,
+            "Fun Activity": faFaceSmile,
+            "Air Travel": faPlane,
+            "Online Shopping": faCartArrowDown,
+            "Waste Collection": faRecycle,
+            "Parking Bill": faParking,
+            "Room Rent": faBed,
+            "Church Collection": faChurch,
+            "Mosque Donations": faMosque,
+            "Charity": faHandHoldingHeart,
+            "Hygiene Product": faPumpMedical,
+            "Tax Bill": faBuildingColumns,
+            "Fuel": faGasPump,
+            "Gas": faFireFlameSimple,
+          };
+      
+          const categoryColors: { [key: string]: any } = {
+            "House Rent": "rgb(153,0,101)",
+            "Wifi": "rgb(153,0,101)",
+            "TV Subscription": "rgb(153,0,101)",
+            "Groceries": "rgb(153,0,101)",
+            "Water Bill": "rgb(153,0,101)",
+            "Electricity Bill": "rgb(153,0,101)",
+            "Hospital": "rgb(153,0,101)",
+            "Pharmacy": "rgb(153,0,101)",
+            "Public Transport": "rgb(245,103,1)",
+            "Private Car": "rgb(245,103,1)",
+            "Fuel": "rgb(245,103,1)",
+            "Gas": "rgb(245,103,1)",
+            "Hotel": "rgb(245,103,1)",
+            "Electronic Device": "rgb(245,103,1)",
+            "Food": "rgb(68, 208, 94)",
+            "Clothes": "rgb(68, 208, 94)",
+            "Maintainance": "rgb(68, 208, 94)",
+            "Salary": "rgb(68, 208, 94)",
+            "Hired Vehicle": "rgb(68, 208, 94)",
+            "Fun Activity": "rgb(68, 208, 94)",
+            "Air Travel": "rgb(68, 208, 94)",
+            "Online Shopping": "rgb(68, 208, 94)",
+            "Waste Collection": "rgb(68, 208, 94)",
+            "Parking Bill": "rgb(118,99,213)",
+            "Room Rent": "rgb(118,99,213)",
+            "Church Collection": "rgb(118,99,213)",
+            "Mosque Donations": "rgb(118,99,213)",
+            "Charity": "rgb(118,99,213)",
+            "Hygiene Product": "rgb(118,99,213)",
+            "Tax Bill": "rgb(118,99,213)",
+            "Shopping": "rgb(118,99,213)",
+          };
+      
+          const colorMapping = response.data.reduce((acc: { [x: string]: any }, item: { _id: string | number; categoryName: string | number; }) => {
+            acc[item._id] = categoryColors[item.categoryName] || "rgb(153,0,101)";
+            return acc;
+          }, {});
+      
+          setIconBgColor(colorMapping);
+      
+          const iconMapping = response.data.reduce((acc: { [x: string]: any }, item: { _id: string | number; categoryName: string | number; }) => {
+            acc[item._id] = categoryIcons[item.categoryName] || faHouseUser;
+            return acc;
+          }, {});
+      
+          setIconMap(iconMapping);
         } catch (error) {
-            console.log("Unable to fetch data", error);
+          console.log("Unable to fetch data", error);
+        } finally {
+          setLoading(false);
+          if (loopAnimation.current) {
+            loopAnimation.current.stop(); // Stop rotating even on error
+          }
         }
-    };
-
+      };
+      
     const fetchMonthlyIncome = async () => {
         try {
           const response = await axios.get("https://financeapi-1.onrender.com/latestMonthlyIncome");
@@ -233,6 +273,15 @@ export default function Main() {
         
     }
 
+    // Function to delete item
+    const deleteData = async (id: string) => {
+        try {
+          await axios.delete(`https://financeapi-1.onrender.com/deleteData/${id}`);
+          console.log("Deleted successfully");
+        } catch (error) {
+          console.error("Error deleting data:", error);
+        }
+      };
       
       const refreshData = () => {
         fetchMonthlyIncome();
@@ -241,10 +290,10 @@ export default function Main() {
         calculateMonthlySavings();
       }
 
-     
-
     useEffect(() => {
        refreshData();
+       setMoneySpent("");
+       showIntro();
     }, []);
 
     // Run `calculateMonthlySavings` only when `latestMonthlyIncome` or `monthlySum` updates  
@@ -256,7 +305,25 @@ useEffect(() => {
       calculateMonthlySavings();
     }, 5000);
   }, [latestMonthlyIncome, monthlySum,seriesSum]);
-    
+
+  
+
+  const rotateInterpolate = rotateRefresh.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  const animatedRotation = {
+    transform: [{ rotate: rotateInterpolate }],
+  }
+
+   const settingsAnimation = (toValue: number) => {
+    Animated.timing(on_off_settings, {
+        toValue,
+        duration: 400,
+        useNativeDriver: true, // Ensure false for translateX
+    }).start();
+   };
 
     const moveAnimation = (toValue: number) => {
         Animated.timing(left_right, {
@@ -286,8 +353,20 @@ useEffect(() => {
         Animated.timing(categoryTranslateX, {
             toValue,
             duration: 400,
-            useNativeDriver: false, 
+            useNativeDriver: true, 
         }).start();
+    };
+
+    const handleSettings = () => {
+        setUpdateSettings((prevSettings) => {
+            const newSettings = prevSettings === "closeSettings" ? "openSettings" : "closeSettings";
+            
+            // Trigger animation based on new state
+            const toValue = newSettings === "openSettings" ? window.width * -0.004 : window.width;
+            settingsAnimation(toValue);
+            
+            return newSettings; // Ensure we return the correct string state
+        });
     };
 
     const handleCategory = () => {
@@ -426,8 +505,7 @@ useEffect(() => {
 
             <View style={{height:window.height*0.1,width:window.width*0.5,
             top:window.height*0.26,position:"absolute",
-            justifyContent:"center",alignItems:"center",flexDirection:"column",
-            }} >
+            justifyContent:"center",alignItems:"center",flexDirection:"column",}}>
                 <Text style={{ display: "flex", position: "relative",
                      color: theme === "light" ? "#000" : "#fff",
                       fontSize: RFValue(12),fontWeight:"700"}}>
@@ -508,11 +586,10 @@ useEffect(() => {
                  height: window.height, width: window.width,
                   backgroundColor:  theme === "light" ? "#fff" : "#000",
                    transform: [{ translateX: open_close_planning }] ,zIndex:4 }]}> 
-               
-             <Text style={{position:"absolute",top:window.height*0.03,
-                fontSize:RFValue(20),color:theme === "light" ? "#000" : "#fff", fontWeight:"500"}} >
-                Plan your Finance 
-            </Text> 
+                       <Text style={{position:"absolute",top:window.height*0.03,
+                        fontSize:RFValue(20),color:theme === "light" ? "#000" : "#fff", fontWeight:"500"}} >
+                         Plan your Finance 
+                      </Text> 
               
               // Check Mark confirming sent data.
             <View style={{height: window.height*0.05, width: window.width*0.1,
@@ -1191,7 +1268,7 @@ useEffect(() => {
                 <Text style={{ display: "flex", position: "absolute", color: theme === "light" ? "#fff" : "#000", fontSize: RFValue(8), left: theme === "light" ? window.width * 0.12 : window.width * 0.03 }}>{theme.toUpperCase()}</Text>
             </View>
 
-        
+
             {/* Menu Bar */}
             <View style={[styles.MenuContainer, { height: window.height * 0.086, width: window.width * 0.96,
                  backgroundColor: theme === "light" ? "rgb(0, 0, 0)" : "rgb(255, 255, 255)", borderRadius: 100,
@@ -1222,17 +1299,67 @@ useEffect(() => {
                     </View>
                 </TouchableOpacity>
             </View>
+
+           // Quick Settings Button
+          <TouchableOpacity  onPress={handleSettings} style={{height:window.height*0.05,width:window.width*0.12,
+           left:window.width * 0.45,top:window.height*0.035,borderRadius:200,
+           position:"absolute",justifyContent:"center",alignItems:"center",
+           backgroundColor:theme === "light" ? "#000" : "#fff" }} >
+           <View style={{height:window.height*0.05,width:window.width*0.12,
+            borderRadius:200,
+           position:"absolute",justifyContent:"center",alignItems:"center",
+           backgroundColor:theme === "light" ? "#000" : "#fff" }} >
+             <FontAwesomeIcon icon={faGear} size={RFValue(20)} color={theme === "light" ? "#fff" : "#000"} />
+           </View>
+          </TouchableOpacity>
+
                 {/* Linear Gradient Display */}
         <LinearGradient 
          colors={['rgb(72, 105, 252)', 'rgb(14, 107, 165)', 'rgb(31, 42, 102)']} start={ {x: 0.1, y: 0.2} } 
-          style={[styles.card,{ height: window.height * 0.25, width: window.width * 0.9, borderRadius: 30,top:window.height*0.12,left:window.width*0.045}]} >
+          style={[styles.card,{ height: window.height * 0.25, width: window.width * 0.9, borderRadius: 30,top:window.height*0.1,left:window.width*0.045}]} >
            <FontAwesomeIcon icon={faCcVisa} size={RFValue(30)} color="rgb(187, 187, 188)" style={{left:window.width * 0.75,top:window.height*0.01,position:"absolute"}}/>
            <FontAwesomeIcon icon={faCcMastercard}size={RFValue(30)} color="rgb(187, 187, 188)" style={{left:window.width * 0.75,top:window.height*0.19,position:"absolute"}}/>
            <FontAwesomeIcon icon={faPaypal} size={RFValue(30)} color="rgb(187, 187, 188)" style={{left:window.width * 0.03,top:window.height*0.19,position:"absolute"}}/>
            <Text style={{fontSize:RFValue(16),fontWeight:"700",top:window.height*0.01,left:window.width*0.05,color:'rgb(255, 255, 255)',position:"absolute"}} >Wallet</Text>
            <Text style={{fontSize:RFValue(36),fontWeight:"700",color:'rgb(255, 255, 255)',position:"absolute"}} >Tsh {latestMonthlyIncome}</Text>
         </LinearGradient>
+           
+      
+        // Settings Pannel
+        <Animated.View
+          style={{ height: window.height * 0.25, width: window.width * 0.9,position:"absolute",
+           borderRadius: 30,top:window.height*0.1,left:window.width*0.045,backgroundColor:theme === "light" ? "#000" : "#fff",
+           justifyContent:"center",alignItems:"center",flexDirection:"column",transform: [{ translateX: on_off_settings }] }} >
+            <View style={{height: window.height * 0.1, width: window.width * 0.8,
+                flexDirection:"row", justifyContent:"center",alignItems:"center",
+                gap:20}} >
+            <Text style={{fontSize:RFValue(16),fontWeight:"700",position:"relative",color:theme === "light" ? "#fff" : "#000"}} >Enable Delete Button</Text>
+            <TouchableOpacity onPress={enableDeleteBtn} >
+          <View style={{height:window.height*0.08,width:window.width*0.16,
+              justifyContent:"center",alignItems:"center"
+          }} >
+          <FontAwesomeIcon icon={faTrashCan}size={RFValue(20)} color="rgb(68, 208, 94)" />
+          </View>
+            </TouchableOpacity>
+            <Text style={{fontSize:RFValue(16),fontWeight:"700",color:"rgb(153,0,101)",position:"relative"}} >On</Text>
+            </View>
+            <View style={{height: window.height * 0.1, width: window.width * 0.8,
+                flexDirection:"row", justifyContent:"center",alignItems:"center",
+                gap:20}} >
+            <Text style={{fontSize:RFValue(16),fontWeight:"700",color:theme === "light" ? "#fff" : "#000",position:"relative"}} >Disable Delete Button</Text>
+            <TouchableOpacity onPress={disableDeleteBtn} >
+            <View style={{height:window.height*0.08,width:window.width*0.16,
+              justifyContent:"center",alignItems:"center"
+          }} >
+          <FontAwesomeIcon icon={faTrashCan}size={RFValue(20)} color="rgb(68, 208, 94)" />
+          </View>
+            </TouchableOpacity>
+            <Text style={{fontSize:RFValue(16),fontWeight:"700",color:"rgb(153,0,101)",position:"relative"}} >Off</Text>
+            </View>
+        </Animated.View>
 
+
+         // Money Spent Display
         <View style={[styles.miniDisplay,{ height: window.height * 0.1, width: window.width * 0.9,
              borderRadius: 30,top:window.height*0.385,left:window.width*0.045,
              backgroundColor:theme === "light" ? "#fff" : "#000",}]} >
@@ -1251,13 +1378,14 @@ useEffect(() => {
 
            // Refresh Buttton
            <TouchableOpacity  onPress={refreshData}>
-           <View style={[styles.refreshBtn,{ height: window.height * 0.08, width: window.width * 0.16,
-             borderRadius:100,backgroundColor:theme === "light" ? "rgb(118,99,213)" : "#fff",}]} >
+           <Animated.View style={[styles.refreshBtn,{ height: window.height * 0.08, width: window.width * 0.16,
+             borderRadius:100,backgroundColor:theme === "light" ? "rgb(118,99,213)" : "#fff",},animatedRotation]} >
                 <FontAwesomeIcon icon={faArrowsSpin} size={RFValue(35)} 
                 color={theme === "light" ? "#fff" :  "rgb(118,99,213)"}/>
-                </View>
+                </Animated.View>
            </TouchableOpacity>
-
+ 
+            // Savings Display
             <View style={[styles.innerMiniDisplay,{ height: window.height * 0.08, width: window.width * 0.3,
              borderRadius:10,backgroundColor:"rgb(68, 208, 94)",}]}  >
                 <Text style={{color:theme === "light" ? "#fff" : "#000",fontSize:RFValue(14),
@@ -1308,26 +1436,35 @@ useEffect(() => {
               <FontAwesomeIcon icon={iconMap[item._id]} size={RFValue(20)} color="rgb(255, 255, 255)"/>
               </View>
             </View> 
-            <View style={{height:window.height*0.055,width:window.width*0.32,justifyContent:"center",flexDirection:"column",overflow:"hidden",}} >
+            <View style={{height:window.height*0.055,width:window.width*0.32,justifyContent:"center",flexDirection:"column",overflow:"hidden"}} >
             <Text style={{color:theme === "light" ? "#fff" : "#000",fontSize:RFValue(12),fontWeight:"700",top:window.height*0.01}} >{item.activityName}</Text>
             <Text style={{color:theme === "light" ? "#fff" : "#000",fontSize:RFValue(12),fontWeight:"700",top:window.height*0.013}} >{item.date}</Text>
             </View>
-            <View style={{height:window.height*0.08,width:window.width*0.45,alignItems:"center",flexDirection:"row",justifyContent:"flex-end"}} >
-            <Text style={{color:theme === "light" ? "#fff" : "#000",fontSize:RFValue(12),fontWeight:"700"}} >Tsh {item.moneySpent}</Text>
+            <View style={{height:window.height*0.08,width:window.width*0.45,alignItems:"center",flexDirection:"row",overflow:"hidden"}} >
+            <TouchableOpacity onPress={()=>deleteData(item._id)}>
+            <View style={{height:window.height*0.08,width:window.width*0.15,alignItems:"center",justifyContent:"center",left:window.width*moveDeleteBtn}} >
+              <FontAwesomeIcon icon={faTrashCan} size={RFValue(16)} color="rgb(255, 0, 0)" style={{top:window.height*0.01}} />
+            </View>
+            </TouchableOpacity>
+            <Text style={{color:theme === "light" ? "#fff" : "#000",fontSize:RFValue(12),fontWeight:"700",left:window.width*0.1,top:window.height*0.01}} >Tsh {item.moneySpent}</Text>
             </View> 
+            
           
         </View>
     );
 })}
-
-
        </ScrollView>
         </View>       
       
     </View>            
-
-           
-
+    // Intro Panel
+          <View style={{height: window.height, width: window.width,position:"absolute",
+           borderRadius: 30,top:window.height*intro,backgroundColor:theme === "light" ? "#fff" : "#fff",
+           justifyContent:"center",alignItems:"center",flexDirection:"column",zIndex:7}} >  
+          <Image source={require("./assets/logo.png")} 
+          style={{height: window.height*0.2, width: window.width*0.8,objectFit:"cover"}}
+          />
+          </View>
         </Animated.View>
     );
 }
